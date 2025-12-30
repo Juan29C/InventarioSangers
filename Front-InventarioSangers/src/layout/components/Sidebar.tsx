@@ -33,8 +33,8 @@ export const Sidebar = () => {
     <div className="w-64 bg-white shadow-lg h-full border-r border-gray-200">
       {/* Header */}
       <div className="p-4 border-b border-gray-200">
-        <h2 className="text-lg font-semibold text-gray-800">Escuela D Fitness</h2>
-        <p className="text-sm text-gray-600">Panel Administrativo</p>
+        <h2 className="text-lg font-semibold text-gray-800">Sangers Corporación</h2>
+        <p className="text-sm text-gray-600">Gestión Inventario</p>
       </div>
 
       {/* Menu Items */}
@@ -49,7 +49,7 @@ export const Sidebar = () => {
                   to={item.link}
                   className={`flex items-center w-full px-3 py-2 text-sm font-medium rounded-lg transition-colors ${
                     isItemActive(item)
-                      ? 'bg-blue-100 text-blue-700 border-l-4 border-blue-500'
+                      ? 'bg-orange-100 text-orange-700 border-l-4 border-orange-500'
                       : 'text-gray-700 hover:bg-gray-100 hover:text-gray-900'
                   }`}
                 >

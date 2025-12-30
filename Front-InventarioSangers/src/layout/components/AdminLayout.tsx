@@ -24,7 +24,7 @@ export const AdminLayout = () => {
                 Panel de Administración
               </h1>
               <p className="text-sm text-gray-600">
-                Gestión de Escuela D Fitness
+                Gestión de inventario Sangers
               </p>
             </div>
             

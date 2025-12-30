@@ -4,22 +4,34 @@ import { LazyWrapper } from './components/LazyWrapper';
 import { ProtectedRoute } from './guard/ProtectedRoute';
 import { AdminLayout } from '../../layout/components/AdminLayout';
 
-// Lazy loading de las páginas principales
-const Cursos = lazy(() =>
-  import('../../pages/cursos/cursos').then((module) => ({ default: module.CursosPage }))
-);
 
 const LoginForm = lazy(() =>
   import('../components/auth/LoginForm').then((module) => ({ default: module.LoginForm }))
 );
 
 // Lazy loading de las páginas administrativas
-const Banners = lazy(() =>
-  import('../../admin/features/bannerAdmin/pages/bannerAdmin').then((module) => ({ default: module.Banners }))
+const DashboardAdmin = lazy(() =>
+  import('../../admin/features/dashboardAdmin/pages/DashboardAdmin').then((module) => ({ default: module.default }))
 );
 
-const Profesores = lazy(() =>
-  import('../../admin/features/profesoresAdmin/pages/profesoresAdmin').then((module) => ({ default: module.Profesores }))
+const InventarioAdmin = lazy(() =>
+  import('../../admin/features/inventarioAdmin/pages/InventarioAdmin').then((module) => ({ default: module.default }))
+);
+
+const UsuariosAdmin = lazy(() =>
+  import('../../admin/features/usuariosAdmin/pages/UsuariosAdmin').then((module) => ({ default: module.default }))
+);
+
+const CronogramaAdmin = lazy(() =>
+  import('../../admin/features/cronogramaAdmin/pages/CronogramaAdmin').then((module) => ({ default: module.default }))
+);
+
+const CrmAdmin = lazy(() =>
+  import('../../admin/features/crmAdmin/pages/CrmAdmin').then((module) => ({ default: module.default }))
+);
+
+const ExtintoresAdmin = lazy(() =>
+  import('../../admin/features/extintoresAdmin/pages/ExtintoresAdmin').then((module) => ({ default: module.default }))
 );
 
 export const routes = [
@@ -33,15 +45,7 @@ export const routes = [
     ),
   },
 
-  // Cursos - Página de cursos
-  {
-    path: '/cursos',
-    element: (
-      <LazyWrapper>
-        <Cursos />
-      </LazyWrapper>
-    ),
-  },
+
 
   // Login - Página de autenticación para administradores (ruta alternativa)
   {
@@ -64,22 +68,54 @@ export const routes = [
     children: [
       {
         index: true,
-        element: <Navigate to="/administrator/banners" replace />,
+        element: <Navigate to="/administrator/dashboard" replace />,
       },
       // Gestión de Contenido
       {
-        path: 'banners',
+        path: 'dashboard',
         element: (
           <LazyWrapper>
-            <Banners />
+            <DashboardAdmin />
           </LazyWrapper>
         ),
       },
       {
-        path: 'profesores',
+        path: 'inventario',
         element: (
           <LazyWrapper>
-            <Profesores />
+            <InventarioAdmin />
+          </LazyWrapper>
+        ),
+      },
+      {
+        path: 'usuarios',
+        element: (
+          <LazyWrapper>
+            <UsuariosAdmin />
+          </LazyWrapper>
+        ),
+      },
+      {
+        path: 'cronograma',
+        element: (
+          <LazyWrapper>
+            <CronogramaAdmin />
+          </LazyWrapper>
+        ),
+      },
+      {
+        path: 'crm',
+        element: (
+          <LazyWrapper>
+            <CrmAdmin />
+          </LazyWrapper>
+        ),
+      },
+      {
+        path: 'extintores',
+        element: (
+          <LazyWrapper>
+            <ExtintoresAdmin />
           </LazyWrapper>
         ),
       },
