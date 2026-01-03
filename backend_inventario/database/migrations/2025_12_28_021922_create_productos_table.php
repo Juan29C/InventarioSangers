@@ -13,19 +13,28 @@ return new class extends Migration
     {
         Schema::create('productos', function (Blueprint $table) {
             $table->increments('id_producto');
+
             $table->string('sku', 50)->nullable()->unique();
             $table->string('nombre', 100);
             $table->text('descripcion')->nullable();
             $table->decimal('precio_compra', 10, 2)->nullable();
             $table->decimal('precio_venta_unitario', 10, 2);
+
             $table->integer('stock_minimo')->default(5);
             $table->boolean('activo')->default(true);
 
+            // Categoría (opcional)
             $table->unsignedInteger('id_categoria')->nullable();
-
             $table->foreign('id_categoria')
                 ->references('id_categoria')
                 ->on('categorias')
+                ->nullOnDelete(); // ON DELETE SET NULL
+
+            // Tipo de categoría (opcional)
+            $table->unsignedInteger('id_tipo')->nullable();
+            $table->foreign('id_tipo')
+                ->references('id_tipo')
+                ->on('categoria_tipos')
                 ->nullOnDelete(); // ON DELETE SET NULL
 
             $table->timestamps();

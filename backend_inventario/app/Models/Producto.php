@@ -21,6 +21,7 @@ class Producto extends Model
         'precio_venta_unitario',
         'stock_minimo',
         'id_categoria',
+        'id_tipo', 
         'activo',
     ];
 
@@ -40,5 +41,9 @@ class Producto extends Model
             'id_categoria',
             'id_categoria'
         );
+    }
+    public function getRouteKeyName()
+    {
+        return 'id_producto';
     }
 }

@@ -8,6 +8,7 @@ use App\Http\Controllers\Api\V1\ProductoController;
 use App\Http\Controllers\Api\V1\UbicacionController;
 use App\Http\Controllers\Api\V1\InventarioController;
 use App\Http\Controllers\Api\V1\StockUbicacionController;
+use App\Http\Controllers\Api\V1\CategoriaTipoController;
 
 Route::prefix('v1')->group(function () {
 
@@ -38,6 +39,11 @@ Route::prefix('v1')->group(function () {
     // Ubicaciones
     Route::get('ubicaciones', [UbicacionController::class, 'index']);
     Route::get('ubicaciones/{ubicacion}', [UbicacionController::class, 'show']);
+
+    // Tipos de Categorías
+    Route::get('categoria-tipos', [CategoriaTipoController::class, 'index']);
+    Route::get('categoria-tipos/{tipo}', [CategoriaTipoController::class, 'show']);
+    Route::get('categorias/{categoria}/tipos', [CategoriaTipoController::class, 'byCategoria']);
 
     // ============================================
     // Protected Routes (JWT - POST/PUT/DELETE)
@@ -80,10 +86,15 @@ Route::prefix('v1')->group(function () {
             Route::post('traslados', [InventarioController::class, 'traslado']);
             Route::post('ajustes', [InventarioController::class, 'ajuste']);
 
-            // Consultas (protegidas)
-            Route::get('stock', [InventarioController::class, 'stock']);
-            Route::get('movimientos', [InventarioController::class, 'movimientos']);        
+        // Consultas (protegidas)
+        Route::get('stock', [InventarioController::class, 'stock']);
+        Route::get('movimientos', [InventarioController::class, 'movimientos']);        
         });
-        
+
+        // Tipos de Categorías (write)
+        Route::post('categoria-tipos', [CategoriaTipoController::class, 'store']);
+        Route::put('categoria-tipos/{tipo}', [CategoriaTipoController::class, 'update']);
+        Route::delete('categoria-tipos/{tipo}', [CategoriaTipoController::class, 'destroy']); // lógico recomendado
+
     });
 });

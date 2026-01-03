@@ -22,4 +22,16 @@ class Categoria extends Model
             'id_categoria'
         );
     }
+    public function tipos()
+    {
+        return $this->hasMany(
+            CategoriaTipo::class,
+            'id_categoria',
+            'id_categoria'
+        );
+    }
+    public function getRouteKeyName()
+    {
+        return 'id_categoria';
+    }
 }
