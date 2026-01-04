@@ -5,8 +5,7 @@ namespace App\Services;
 use App\Models\Movimiento;
 use App\Models\StockUbicacion;
 use Illuminate\Support\Facades\DB;
-use InvalidArgumentException;
-use RuntimeException;
+use Illuminate\Validation\ValidationException;
 
 class InventarioService
 {
@@ -41,7 +40,6 @@ class InventarioService
 
     /**
      * Registra una SALIDA y actualiza stock_ubicacion.
-     * Por defecto NO permite dejar stock en negativo.
      */
     public function salida(
         int $idProducto,
@@ -57,8 +55,10 @@ class InventarioService
 
             $stock = $this->getOrCreateStockRowLocked($idProducto, $idUbicacion);
 
-            if (!$permitirNegativo && ($stock->cantidad - $cantidad) < 0) {
-                throw new RuntimeException('Stock insuficiente para realizar la salida.');
+            if (! $permitirNegativo && ($stock->cantidad - $cantidad) < 0) {
+                throw ValidationException::withMessages([
+                    'cantidad' => ['Stock insuficiente para realizar la salida.'],
+                ]);
             }
 
             $stock->cantidad -= $cantidad;
@@ -76,7 +76,7 @@ class InventarioService
     }
 
     /**
-     * TRASLADO: se registra como 2 movimientos (salida origen + entrada destino) con una misma referencia.
+     * TRASLADO: salida en origen + entrada en destino (misma referencia).
      */
     public function traslado(
         int $idProducto,
@@ -87,29 +87,29 @@ class InventarioService
         ?string $referencia = null
     ): array {
         if ($idUbicacionOrigen === $idUbicacionDestino) {
-            throw new InvalidArgumentException('La ubicación origen y destino no pueden ser la misma.');
+            throw ValidationException::withMessages([
+                'id_ubicacion_destino' => ['La ubicación origen y destino no pueden ser la misma.'],
+            ]);
         }
+
         $this->assertCantidadPositiva($cantidad);
 
         return DB::transaction(function () use ($idProducto, $idUbicacionOrigen, $idUbicacionDestino, $cantidad, $motivo, $referencia) {
 
-            // Para evitar deadlocks: bloquea siempre en orden consistente
-            $pairs = [
-                [$idProducto, $idUbicacionOrigen],
-                [$idProducto, $idUbicacionDestino],
-            ];
-            sort($pairs);
+            // Lock consistente por ubicación (evita deadlocks)
+            $ids = [$idUbicacionOrigen, $idUbicacionDestino];
+            sort($ids);
 
-            $locked = [];
-            foreach ($pairs as [$p, $u]) {
-                $locked["$p-$u"] = $this->getOrCreateStockRowLocked($p, $u);
-            }
+            $stockA = $this->getOrCreateStockRowLocked($idProducto, $ids[0]);
+            $stockB = $this->getOrCreateStockRowLocked($idProducto, $ids[1]);
 
-            $stockOrigen = $locked["$idProducto-$idUbicacionOrigen"];
-            $stockDestino = $locked["$idProducto-$idUbicacionDestino"];
+            $stockOrigen  = $idUbicacionOrigen === $ids[0] ? $stockA : $stockB;
+            $stockDestino = $idUbicacionDestino === $ids[0] ? $stockA : $stockB;
 
             if (($stockOrigen->cantidad - $cantidad) < 0) {
-                throw new RuntimeException('Stock insuficiente en la ubicación origen para trasladar.');
+                throw ValidationException::withMessages([
+                    'cantidad' => ['Stock insuficiente en la ubicación origen para trasladar.'],
+                ]);
             }
 
             $stockOrigen->cantidad -= $cantidad;
@@ -120,35 +120,30 @@ class InventarioService
 
             $ref = $referencia ?? ('TRASLADO-' . now()->format('YmdHis'));
 
-            $movSalida = Movimiento::create([
-                'id_producto' => $idProducto,
-                'id_ubicacion' => $idUbicacionOrigen,
-                'tipo' => 'salida',
-                'cantidad' => $cantidad,
-                'motivo' => $motivo ? $motivo . ' (origen)' : 'Traslado (origen)',
-                'referencia' => $ref,
-            ]);
-
-            $movEntrada = Movimiento::create([
-                'id_producto' => $idProducto,
-                'id_ubicacion' => $idUbicacionDestino,
-                'tipo' => 'entrada',
-                'cantidad' => $cantidad,
-                'motivo' => $motivo ? $motivo . ' (destino)' : 'Traslado (destino)',
-                'referencia' => $ref,
-            ]);
-
             return [
                 'referencia' => $ref,
-                'salida' => $movSalida,
-                'entrada' => $movEntrada,
+                'salida' => Movimiento::create([
+                    'id_producto' => $idProducto,
+                    'id_ubicacion' => $idUbicacionOrigen,
+                    'tipo' => 'salida',
+                    'cantidad' => $cantidad,
+                    'motivo' => $motivo ? $motivo . ' (origen)' : 'Traslado (origen)',
+                    'referencia' => $ref,
+                ]),
+                'entrada' => Movimiento::create([
+                    'id_producto' => $idProducto,
+                    'id_ubicacion' => $idUbicacionDestino,
+                    'tipo' => 'entrada',
+                    'cantidad' => $cantidad,
+                    'motivo' => $motivo ? $motivo . ' (destino)' : 'Traslado (destino)',
+                    'referencia' => $ref,
+                ]),
             ];
         });
     }
 
     /**
-     * AJUSTE: fija el stock a un valor objetivo; registra un movimiento por la diferencia.
-     * Retorna null si no hay diferencia.
+     * AJUSTE: fija stock a un valor objetivo.
      */
     public function ajuste(
         int $idProducto,
@@ -158,7 +153,9 @@ class InventarioService
         ?string $referencia = null
     ): ?Movimiento {
         if ($cantidadObjetivo < 0) {
-            throw new InvalidArgumentException('La cantidad objetivo no puede ser negativa.');
+            throw ValidationException::withMessages([
+                'cantidad_objetivo' => ['La cantidad objetivo no puede ser negativa.'],
+            ]);
         }
 
         return DB::transaction(function () use ($idProducto, $idUbicacion, $cantidadObjetivo, $motivo, $referencia) {
@@ -171,7 +168,6 @@ class InventarioService
             }
 
             $tipo = $diferencia > 0 ? 'entrada' : 'salida';
-            $cantidadMovimiento = abs($diferencia);
 
             $stock->cantidad = $cantidadObjetivo;
             $stock->save();
@@ -180,7 +176,7 @@ class InventarioService
                 'id_producto' => $idProducto,
                 'id_ubicacion' => $idUbicacion,
                 'tipo' => $tipo,
-                'cantidad' => $cantidadMovimiento,
+                'cantidad' => abs($diferencia),
                 'motivo' => $motivo ?? 'Ajuste por inventario físico',
                 'referencia' => $referencia ?? ('AJUSTE-' . now()->format('YmdHis')),
             ]);
@@ -188,8 +184,7 @@ class InventarioService
     }
 
     /**
-     * Obtiene o crea la fila de stock para (producto, ubicación) con lock FOR UPDATE.
-     * Requiere unique(id_producto,id_ubicacion) (ya lo tienes).
+     * Obtiene o crea stock con lock FOR UPDATE.
      */
     private function getOrCreateStockRowLocked(int $idProducto, int $idUbicacion): StockUbicacion
     {
@@ -203,14 +198,12 @@ class InventarioService
         }
 
         try {
-            // Si no existe aún, se crea con 0
             return StockUbicacion::create([
                 'id_producto' => $idProducto,
                 'id_ubicacion' => $idUbicacion,
                 'cantidad' => 0,
             ]);
         } catch (\Throwable $e) {
-            // Si hubo carrera y ya existe por el unique, re-leer con lock
             return StockUbicacion::where('id_producto', $idProducto)
                 ->where('id_ubicacion', $idUbicacion)
                 ->lockForUpdate()
@@ -221,7 +214,9 @@ class InventarioService
     private function assertCantidadPositiva(int $cantidad): void
     {
         if ($cantidad <= 0) {
-            throw new InvalidArgumentException('La cantidad debe ser mayor a 0.');
+            throw ValidationException::withMessages([
+                'cantidad' => ['La cantidad debe ser mayor a 0.'],
+            ]);
         }
     }
 }

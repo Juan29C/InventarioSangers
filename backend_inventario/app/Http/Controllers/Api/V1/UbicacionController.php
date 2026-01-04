@@ -7,6 +7,7 @@ use App\Models\Ubicacion;
 use App\Http\Requests\Ubicacion\StoreUbicacionRequest;
 use App\Http\Requests\Ubicacion\UpdateUbicacionRequest;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Database\QueryException;
 
 class UbicacionController extends Controller
 {
@@ -34,37 +35,40 @@ class UbicacionController extends Controller
         return response()->json($ubicacion);
     }
 
-    public function destroy(Ubicacion $ubicacion)
-        {
-            $ubicacion->update(['activo' => false]);
+    // Desactivación lógica
+    public function destroy(Ubicacion $ubicacion): JsonResponse
+    {
+        $ubicacion->update(['activo' => false]);
+
+        return response()->json([
+            'ok' => true,
+            'tipo' => 'desactivada',
+            'id_ubicacion' => $ubicacion->id_ubicacion,
+            'activo' => $ubicacion->activo,
+        ]);
+    }
+
+    // Eliminación física (forzada)
+    public function forceDestroy(Ubicacion $ubicacion): JsonResponse
+    {
+        if ($ubicacion->stocks()->exists()) {
+            return response()->json([
+                'message' => 'No se puede eliminar físicamente una ubicación con stock asociado'
+            ], 409);
+        }
+
+        try {
+            $ubicacion->delete();
 
             return response()->json([
                 'ok' => true,
-                'tipo' => 'desactivada'
+                'tipo' => 'eliminada',
+                'id_ubicacion' => $ubicacion->id_ubicacion,
             ]);
+        } catch (QueryException $e) {
+            return response()->json([
+                'message' => 'No se puede eliminar la ubicación por dependencias en el sistema'
+            ], 409);
         }
-
-        // Eliminación física (forzada)
-        public function forceDestroy(Ubicacion $ubicacion)
-        {
-            // Regla de seguridad mínima
-            if ($ubicacion->stocks()->exists()) {
-                return response()->json([
-                    'message' => 'No se puede eliminar físicamente una ubicación con stock asociado'
-                ], 409);
-            }
-
-            try {
-                $ubicacion->delete();
-
-                return response()->json([
-                    'ok' => true,
-                    'tipo' => 'eliminada'
-                ]);
-            } catch (QueryException $e) {
-                return response()->json([
-                    'message' => 'No se puede eliminar la ubicación por dependencias en el sistema'
-                ], 409);
-            }
-        }
+    }
 }

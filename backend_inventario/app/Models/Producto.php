@@ -21,7 +21,7 @@ class Producto extends Model
         'precio_venta_unitario',
         'stock_minimo',
         'id_categoria',
-        'id_tipo', 
+        'id_tipo',
         'activo',
     ];
 
@@ -31,9 +31,6 @@ class Producto extends Model
         'activo' => 'boolean',
     ];
 
-    /**
-     * Relación: Producto pertenece a una Categoría
-     */
     public function categoria()
     {
         return $this->belongsTo(
@@ -42,6 +39,17 @@ class Producto extends Model
             'id_categoria'
         );
     }
+
+    // ✅ NUEVO: relación con tipo de categoría
+    public function tipo()
+    {
+        return $this->belongsTo(
+            CategoriaTipo::class,
+            'id_tipo',
+            'id_tipo'
+        );
+    }
+
     public function getRouteKeyName()
     {
         return 'id_producto';

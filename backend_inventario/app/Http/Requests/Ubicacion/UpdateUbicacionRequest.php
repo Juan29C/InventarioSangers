@@ -7,6 +7,11 @@ use App\Models\Ubicacion;
 
 class UpdateUbicacionRequest extends FormRequest
 {
+    public function authorize(): bool
+    {
+        return true;
+    }
+
     public function rules(): array
     {
         $routeParam = $this->route('ubicacion');
@@ -20,8 +25,11 @@ class UpdateUbicacionRequest extends FormRequest
                 'required',
                 'string',
                 'max:100',
-                "unique:ubicaciones,nombre_ubicacion,{$idUbicacion},id_ubicacion"
+                "unique:ubicaciones,nombre_ubicacion,{$idUbicacion},id_ubicacion",
             ],
+
+            // Opcional si quieres permitir reactivar/desactivar desde update:
+            // 'activo' => ['sometimes', 'boolean'],
         ];
     }
 }
