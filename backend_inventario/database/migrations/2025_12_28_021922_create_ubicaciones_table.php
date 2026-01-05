@@ -14,6 +14,7 @@ return new class extends Migration
         Schema::create('ubicaciones', function (Blueprint $table) {
             $table->increments('id_ubicacion');
             $table->string('nombre_ubicacion', 100);
+            $table->boolean('activo')->default(true);
         });
     }
 
