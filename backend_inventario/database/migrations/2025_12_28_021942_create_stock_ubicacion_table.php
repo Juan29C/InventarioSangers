@@ -18,6 +18,8 @@ return new class extends Migration
             $table->unsignedInteger('id_ubicacion');
             $table->integer('cantidad')->default(0);
 
+            $table->unique(['id_producto', 'id_ubicacion']);
+
             $table->foreign('id_producto')
                 ->references('id_producto')->on('productos')
                 ->onDelete('cascade');
@@ -26,6 +28,7 @@ return new class extends Migration
                 ->references('id_ubicacion')->on('ubicaciones')
                 ->onDelete('cascade');
         });
+
     }
 
     /**

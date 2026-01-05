@@ -6,25 +6,29 @@ use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
 {
-    /**
-     * Run the migrations.
-     */
     public function up(): void
     {
         Schema::create('promociones_precio', function (Blueprint $table) {
             $table->increments('id_promo');
 
-            $table->unsignedInteger('id_producto')->nullable();
-            $table->integer('cantidad_minima');
-            $table->decimal('precio_oferta', 10, 2);
+            $table->unsignedInteger('id_producto');
+            $table->integer('cantidad_minima');          // compra mínima (>=1)
+            $table->decimal('precio_oferta', 10, 2);     // precio unitario en oferta
 
-            $table->foreign('id_producto')->references('id_producto')->on('productos');
+            $table->boolean('activo')->default(true);
+            $table->unsignedSmallInteger('prioridad')->default(100);
+
+            $table->timestamps();
+
+            $table->foreign('id_producto')
+                ->references('id_producto')
+                ->on('productos')
+                ->cascadeOnDelete();
+
+            $table->index(['id_producto', 'activo']);
         });
     }
 
-    /**
-     * Reverse the migrations.
-     */
     public function down(): void
     {
         Schema::dropIfExists('promociones_precio');
