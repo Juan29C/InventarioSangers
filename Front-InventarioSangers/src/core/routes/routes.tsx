@@ -95,7 +95,7 @@ export const routes = [
         ),
       },
       {
-        path: 'inventario',
+        path: 'inventario/productos',
         element: (
           <LazyWrapper>
             <InventarioAdmin />
@@ -143,7 +143,7 @@ export const routes = [
         ),
       },
       {
-        path: 'ubicaciones',
+        path: 'inventario/ubicaciones',
         element: (
           <LazyWrapper>
             <UbicacionesAdmin />

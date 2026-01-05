@@ -33,10 +33,26 @@ export const menuItems: MenuItem[] = [
         icon: Home,
         link: '/administrator/dashboard',
     },
-    {
-        titulo: 'Inventario',
-        icon: Box,
-        link: '/administrator/inventario',
+       {
+        titulo: 'Gestión de Inventario', 
+        icon: Briefcase,
+        subMenu: [
+            {
+                titulo: 'Productos',
+                icon: Briefcase,
+                link: '/administrator/inventario/productos',
+            },
+            {
+                titulo: 'Ubicaciones', 
+                icon: Map,
+                link: '/administrator/inventario/ubicaciones',
+            },
+            {
+                titulo: 'Categorias/Tipos', 
+                icon: LayoutGrid,
+                link: '/administrator/inventario/categorias-tipos',
+            },
+        ]
     },
     {
         titulo: 'Usuarios',
@@ -80,9 +96,5 @@ export const menuItems: MenuItem[] = [
         icon: Shield,
         link: '/administrator/extintores',
     },
-    {
-        titulo: 'Ubicaciones',
-        icon: Map,
-        link: '/administrator/ubicaciones',
-    },
+   
 ];
