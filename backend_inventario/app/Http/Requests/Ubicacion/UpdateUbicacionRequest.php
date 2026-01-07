@@ -28,8 +28,7 @@ class UpdateUbicacionRequest extends FormRequest
                 "unique:ubicaciones,nombre_ubicacion,{$idUbicacion},id_ubicacion",
             ],
 
-            // Opcional si quieres permitir reactivar/desactivar desde update:
-            // 'activo' => ['sometimes', 'boolean'],
+           'activo' => ['sometimes', 'boolean'],
         ];
     }
 }
