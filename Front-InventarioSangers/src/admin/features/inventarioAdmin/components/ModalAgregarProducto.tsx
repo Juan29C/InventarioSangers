@@ -1,11 +1,11 @@
-import { X, Plus, Trash2 } from "lucide-react";
-import { useState } from "react";
-
-interface Promocion {
-    id: number;
-    cantidadMinima: number;
-    descuento: number;
-}
+import { X } from "lucide-react";
+import { useState, useEffect } from "react";
+import { listarCategoriasService } from "../../categoriaProductoAdmin/services/listarCategoria";
+import { listarTiposService } from "../../categoriaProductoAdmin/services/tipo/listarTipoCate";
+import type { CategoriaResponse, TipoResponse } from "../../categoriaProductoAdmin/schemas/Interface";
+import { crearProductoService } from "../services/crearInventario";
+import type { CreateProductoRequest } from "../schema/Interface";
+import { productoSchema } from "../schema/InventarioSchema";
 
 interface ModalAgregarProductoProps {
     isOpen: boolean;
@@ -22,51 +22,113 @@ export function ModalAgregarProducto({ isOpen, onClose, onSubmit }: ModalAgregar
     const [precioCompra, setPrecioCompra] = useState("");
     const [precioVenta, setPrecioVenta] = useState("");
     const [stockMinimo, setStockMinimo] = useState("");
-    const [tienda, setTienda] = useState("");
-    const [almacen1, setAlmacen1] = useState("");
-    const [almacen2, setAlmacen2] = useState("");
 
-    const [promociones, setPromociones] = useState<Promocion[]>([
-        { id: 1, cantidadMinima: 3, descuento: 2.0 }
-    ]);
+    // Estados para listas dinámicas
+    const [categorias, setCategorias] = useState<CategoriaResponse[]>([]);
+    const [tipos, setTipos] = useState<TipoResponse[]>([]);
+    const [loadingCategorias, setLoadingCategorias] = useState(false);
+    const [loadingTipos, setLoadingTipos] = useState(false);
+    const [submitting, setSubmitting] = useState(false);
+    const [error, setError] = useState<string | null>(null);
 
-    const agregarPromocion = () => {
-        const newId = Math.max(...promociones.map(p => p.id), 0) + 1;
-        setPromociones([...promociones, { id: newId, cantidadMinima: 0, descuento: 0 }]);
-    };
-
-    const eliminarPromocion = (id: number) => {
-        if (promociones.length > 1) {
-            setPromociones(promociones.filter(p => p.id !== id));
-        }
-    };
-
-    const actualizarPromocion = (id: number, field: 'cantidadMinima' | 'descuento', value: number) => {
-        setPromociones(promociones.map(p =>
-            p.id === id ? { ...p, [field]: value } : p
-        ));
-    };
-
-    const handleSubmit = (e: React.FormEvent) => {
-        e.preventDefault();
-
-        const producto = {
-            sku,
-            nombre,
-            descripcion,
-            categoria,
-            tipo: categoria === 'Extintores' ? tipo : undefined,
-            precioCompra: parseFloat(precioCompra),
-            precioVenta: parseFloat(precioVenta),
-            stockMinimo: parseInt(stockMinimo),
-            tienda: parseInt(tienda),
-            almacen1: parseInt(almacen1),
-            almacen2: parseInt(almacen2),
-            promociones
+    // Cargar categorías al montar el componente
+    useEffect(() => {
+        const fetchCategorias = async () => {
+            setLoadingCategorias(true);
+            try {
+                const data = await listarCategoriasService();
+                setCategorias(data);
+            } catch (error) {
+                console.error("Error al cargar categorías:", error);
+            } finally {
+                setLoadingCategorias(false);
+            }
         };
 
-        onSubmit(producto);
-        handleClose();
+        if (isOpen) {
+            fetchCategorias();
+        }
+    }, [isOpen]);
+
+    // Cargar tipos cuando cambia la categoría
+    useEffect(() => {
+        const fetchTipos = async () => {
+            if (!categoria) {
+                setTipos([]);
+                return;
+            }
+
+            setLoadingTipos(true);
+            try {
+                const data = await listarTiposService();
+                // Filtrar tipos por la categoría seleccionada
+                const categoriaSeleccionada = categorias.find(
+                    cat => cat.nombre_categoria === categoria
+                );
+                if (categoriaSeleccionada) {
+                    const tiposFiltrados = data.filter(
+                        tipo => tipo.id_categoria === categoriaSeleccionada.id_categoria && tipo.activo
+                    );
+                    setTipos(tiposFiltrados);
+                }
+            } catch (error) {
+                console.error("Error al cargar tipos:", error);
+            } finally {
+                setLoadingTipos(false);
+            }
+        };
+
+        fetchTipos();
+    }, [categoria, categorias]);
+
+    const handleSubmit = async (e: React.FormEvent) => {
+        e.preventDefault();
+        setError(null);
+        setSubmitting(true);
+
+        try {
+            // Encontrar los IDs de categoría y tipo
+            const categoriaSeleccionada = categorias.find(
+                cat => cat.nombre_categoria === categoria
+            );
+            const tipoSeleccionado = tipos.find(
+                t => t.nombre_tipo === tipo
+            );
+
+            if (!categoriaSeleccionada || !tipoSeleccionado) {
+                throw new Error("Categoría o tipo no válido");
+            }
+
+            const productoData: CreateProductoRequest = {
+                sku,
+                nombre,
+                descripcion: descripcion || undefined,
+                precio_compra: parseFloat(precioCompra),
+                precio_venta_unitario: parseFloat(precioVenta),
+                stock_minimo: parseInt(stockMinimo),
+                id_categoria: categoriaSeleccionada.id_categoria,
+                id_tipo: tipoSeleccionado.id_tipo,
+                activo: true,
+            };
+
+            // Validar con Zod
+            const validationResult = productoSchema.safeParse(productoData);
+
+            if (!validationResult.success) {
+                // Extraer el primer error de validación
+                const firstError = validationResult.error.issues[0];
+                throw new Error(firstError.message);
+            }
+
+            const response = await crearProductoService(productoData);
+            onSubmit(response);
+            handleClose();
+        } catch (err: any) {
+            console.error("Error al crear producto:", err);
+            setError(err.message || err.response?.data?.message || "Error al crear el producto. Por favor, intente nuevamente.");
+        } finally {
+            setSubmitting(false);
+        }
     };
 
     const handleClose = () => {
@@ -79,10 +141,7 @@ export function ModalAgregarProducto({ isOpen, onClose, onSubmit }: ModalAgregar
         setPrecioCompra("");
         setPrecioVenta("");
         setStockMinimo("");
-        setTienda("");
-        setAlmacen1("");
-        setAlmacen2("");
-        setPromociones([{ id: 1, cantidadMinima: 3, descuento: 2.0 }]);
+        setError(null);
         onClose();
     };
 
@@ -95,7 +154,7 @@ export function ModalAgregarProducto({ isOpen, onClose, onSubmit }: ModalAgregar
                 <div className="sticky top-0 z-10 flex items-center justify-between p-6 bg-white border-b border-slate-200">
                     <div>
                         <h2 className="text-2xl font-bold text-slate-900">Agregar Nuevo Producto</h2>
-                        <p className="mt-1 text-sm text-slate-600">Complete los datos del producto y su inventario inicial</p>
+                        <p className="mt-1 text-sm text-slate-600">Complete los datos básicos del producto</p>
                     </div>
                     <button
                         onClick={handleClose}
@@ -160,41 +219,56 @@ export function ModalAgregarProducto({ isOpen, onClose, onSubmit }: ModalAgregar
                                 onChange={(e) => {
                                     setCategoria(e.target.value);
                                     // Reset tipo when changing category
-                                    if (e.target.value !== 'Extintores') {
-                                        setTipo('');
-                                    }
+                                    setTipo('');
                                 }}
                                 required
-                                className="w-full px-4 py-2.5 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent transition-colors"
+                                disabled={loadingCategorias}
+                                className="w-full px-4 py-2.5 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent transition-colors disabled:bg-slate-100 disabled:cursor-not-allowed"
                             >
-                                <option value="">Seleccionar categoría</option>
-                                <option value="Seguridad">Seguridad</option>
-                                <option value="Extintores">Extintores</option>
+                                <option value="">
+                                    {loadingCategorias ? 'Cargando categorías...' : 'Seleccionar categoría'}
+                                </option>
+                                {categorias.map((cat) => (
+                                    <option key={cat.id_categoria} value={cat.nombre_categoria}>
+                                        {cat.nombre_categoria}
+                                    </option>
+                                ))}
                             </select>
                         </div>
 
-                        {/* Tipo - Solo visible cuando categoría es Extintores */}
-                        {categoria === 'Extintores' && (
-                            <div>
-                                <label className="block mb-2 text-sm font-medium text-slate-700">
-                                    Tipo <span className="text-red-600">*</span>
-                                </label>
-                                <select
-                                    value={tipo}
-                                    onChange={(e) => setTipo(e.target.value)}
-                                    required
-                                    className="w-full px-4 py-2.5 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent transition-colors"
-                                >
-                                    <option value="">Seleccionar tipo</option>
-                                    <option value="A">Tipo A</option>
-                                    <option value="B">Tipo B</option>
-                                    <option value="C">Tipo C</option>
-                                    <option value="D">Tipo D</option>
-                                </select>
-                            </div>
-                        )}
+                        <div>
+                            <label className="block mb-2 text-sm font-medium text-slate-700">
+                                Tipo <span className="text-red-600">*</span>
+                            </label>
+                            <select
+                                value={tipo}
+                                onChange={(e) => setTipo(e.target.value)}
+                                required
+                                disabled={!categoria || loadingTipos}
+                                className="w-full px-4 py-2.5 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent transition-colors disabled:bg-slate-100 disabled:cursor-not-allowed"
+                            >
+                                <option value="">
+                                    {!categoria
+                                        ? 'Primero seleccione una categoría'
+                                        : loadingTipos
+                                            ? 'Cargando tipos...'
+                                            : tipos.length === 0
+                                                ? 'No hay tipos disponibles'
+                                                : 'Seleccionar tipo'}
+                                </option>
+                                {tipos.map((tipo) => (
+                                    <option key={tipo.id_tipo} value={tipo.nombre_tipo}>
+                                        {tipo.nombre_tipo}
+                                    </option>
+                                ))}
+                            </select>
+                            {!categoria && (
+                                <p className="mt-1 text-xs text-slate-500">
+                                    Seleccione primero una categoría
+                                </p>
+                            )}
+                        </div>
                     </div>
-
 
                     {/* Precios y Stock Mínimo */}
                     <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
@@ -241,119 +315,38 @@ export function ModalAgregarProducto({ isOpen, onClose, onSubmit }: ModalAgregar
                         </div>
                     </div>
 
-                    {/* Promoción por Mayor */}
-                    <div className="p-4 border rounded-lg bg-slate-50 border-slate-200">
-                        <div className="flex items-center justify-between mb-3">
-                            <div>
-                                <h3 className="text-sm font-semibold text-slate-900">Promoción por Mayor</h3>
-                                <p className="text-xs text-slate-600">Configure descuentos automáticos al comprar grandes cantidades</p>
-                            </div>
-                            <button
-                                type="button"
-                                onClick={agregarPromocion}
-                                className="flex items-center px-3 py-1.5 space-x-1 text-sm font-medium text-orange-700 transition-colors bg-orange-100 rounded-lg hover:bg-orange-200"
-                            >
-                                <Plus className="w-4 h-4" />
-                                <span>Agregar</span>
-                            </button>
-                        </div>
-
-                        <div className="space-y-3">
-                            {promociones.map((promo) => (
-                                <div key={promo.id} className="grid grid-cols-1 gap-3 md:grid-cols-2">
-                                    <div>
-                                        <label className="block mb-1 text-xs font-medium text-slate-700">
-                                            Cantidad mínima
-                                        </label>
-                                        <input
-                                            type="number"
-                                            value={promo.cantidadMinima}
-                                            onChange={(e) => actualizarPromocion(promo.id, 'cantidadMinima', parseInt(e.target.value) || 0)}
-                                            placeholder="3"
-                                            className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent transition-colors"
-                                        />
-                                    </div>
-                                    <div className="flex gap-2">
-                                        <div className="flex-1">
-                                            <label className="block mb-1 text-xs font-medium text-slate-700">
-                                                Descuento (S/) por unidad
-                                            </label>
-                                            <input
-                                                type="number"
-                                                step="0.01"
-                                                value={promo.descuento}
-                                                onChange={(e) => actualizarPromocion(promo.id, 'descuento', parseFloat(e.target.value) || 0)}
-                                                placeholder="2.00"
-                                                className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent transition-colors"
-                                            />
-                                        </div>
-                                        {promociones.length > 1 && (
-                                            <button
-                                                type="button"
-                                                onClick={() => eliminarPromocion(promo.id)}
-                                                className="self-end p-2 transition-colors rounded-lg text-slate-400 hover:text-red-600 hover:bg-red-50"
-                                                title="Eliminar promoción"
-                                            >
-                                                <Trash2 className="w-4 h-4" />
-                                            </button>
-                                        )}
-                                    </div>
-                                </div>
-                            ))}
-                        </div>
+                    {/* Info Note */}
+                    <div className="p-4 border-l-4 border-orange-500 bg-orange-50">
+                        <p className="text-sm text-orange-800">
+                            <strong>Nota:</strong> El stock inicial y las promociones se gestionan desde el botón "Gestión de Inventario" en la tabla de productos.
+                        </p>
                     </div>
 
-                    {/* Stock Inicial por Ubicación */}
-                    <div className="p-4 border rounded-lg bg-slate-50 border-slate-200">
-                        <h3 className="mb-3 text-sm font-semibold text-slate-900">Stock Inicial por Ubicación</h3>
-                        <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-                            <div>
-                                <label className="block mb-2 text-xs font-medium text-slate-700">Tienda</label>
-                                <input
-                                    type="number"
-                                    value={tienda}
-                                    onChange={(e) => setTienda(e.target.value)}
-                                    placeholder="15"
-                                    className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent transition-colors"
-                                />
-                            </div>
-                            <div>
-                                <label className="block mb-2 text-xs font-medium text-slate-700">Almacén 1</label>
-                                <input
-                                    type="number"
-                                    value={almacen1}
-                                    onChange={(e) => setAlmacen1(e.target.value)}
-                                    placeholder="30"
-                                    className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent transition-colors"
-                                />
-                            </div>
-                            <div>
-                                <label className="block mb-2 text-xs font-medium text-slate-700">Almacén 2</label>
-                                <input
-                                    type="number"
-                                    value={almacen2}
-                                    onChange={(e) => setAlmacen2(e.target.value)}
-                                    placeholder="20"
-                                    className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent transition-colors"
-                                />
-                            </div>
+                    {/* Error Message */}
+                    {error && (
+                        <div className="p-4 border-l-4 border-red-500 bg-red-50">
+                            <p className="text-sm text-red-800">
+                                <strong>Error:</strong> {error}
+                            </p>
                         </div>
-                    </div>
+                    )}
 
                     {/* Buttons */}
                     <div className="flex justify-end gap-3 pt-4 border-t border-slate-200">
                         <button
                             type="button"
                             onClick={handleClose}
-                            className="px-6 py-2.5 text-sm font-medium text-slate-700 transition-colors bg-white border border-slate-300 rounded-lg hover:bg-slate-50"
+                            disabled={submitting}
+                            className="px-6 py-2.5 text-sm font-medium text-slate-700 transition-colors bg-white border border-slate-300 rounded-lg hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed"
                         >
                             Cancelar
                         </button>
                         <button
                             type="submit"
-                            className="px-6 py-2.5 text-sm font-medium text-white transition-colors bg-orange-600 rounded-lg hover:bg-orange-700"
+                            disabled={submitting}
+                            className="px-6 py-2.5 text-sm font-medium text-white transition-colors bg-orange-600 rounded-lg hover:bg-orange-700 disabled:opacity-50 disabled:cursor-not-allowed"
                         >
-                            Agregar Producto
+                            {submitting ? 'Guardando...' : 'Agregar Producto'}
                         </button>
                     </div>
                 </form>

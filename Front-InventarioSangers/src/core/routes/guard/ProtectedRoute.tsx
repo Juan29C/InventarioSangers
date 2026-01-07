@@ -6,11 +6,10 @@ interface ProtectedRouteProps {
 }
 
 export const ProtectedRoute = ({ children }: ProtectedRouteProps) => {
-  const isAuthenticated = localStorage.getItem('isAuthenticated') === 'true';
-  const userRole = localStorage.getItem('userRole');
+  const authToken = localStorage.getItem('authToken');
 
-  if (!isAuthenticated || userRole !== 'administrator') {
-    return <Navigate to="/admin" replace />;
+  if (!authToken) {
+    return <Navigate to="/" replace />;
   }
 
   return <>{children}</>;

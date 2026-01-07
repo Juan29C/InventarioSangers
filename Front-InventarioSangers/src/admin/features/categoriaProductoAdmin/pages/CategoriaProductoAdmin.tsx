@@ -1,41 +1,43 @@
-import { Edit, Plus, Search, Power, AlertCircle, Map } from "lucide-react"
+import { Edit, Plus, Search, Trash2, AlertCircle, Tag, BadgePlus } from "lucide-react"
 import { useState, useMemo, useEffect } from "react"
-import { CrearUbicacionModal } from "../components/CrearUbicacionModal"
-import { ActualizarUbicacionModal } from "../components/ActualizarUbicacionModal"
-import { ConfirmToggleModal } from "../components/ConfirmToggleModal"
-import { crearUbicacionService } from "../services/crearUbicaciones"
-import { listarUbicacionesService } from "../services/listarUbicaciones"
-import { eliminarUbicacionService } from "../services/eliminarUbicaciones"
-import { actualizarUbicacionService } from "../services/actualizarUbicaciones"
-import type { CreateUbicacionRequest, UbicacionResponse } from "../schemas/Inferface"
+import { CrearCategoriaProModal } from "../components/CrearCategoriaProModal"
+import { ActualizarCategoriaProModal } from "../components/ActualizarCategoriaProModal"
+import { ConfirmDeleteModal } from "../components/ConfirmDeleteModal"
+import { GestionarTiposModal } from "../components/GestionarTiposModal"
+import { crearCategoriaService } from "../services/crearCategoria"
+import { listarCategoriasService } from "../services/listarCategoria"
+import { eliminarCategoriaService } from "../services/eliminarCategoria"
+import { actualizarCategoriaService } from "../services/actualizarCategoria"
+import type { CreateCategoriaRequest, CategoriaResponse } from "../schemas/Interface"
 
 const ITEMS_PER_PAGE = 5;
 
-export default function UbicacionesAdmin() {
+export default function CategoriaProductoAdmin() {
     const [searchTerm, setSearchTerm] = useState("")
     const [loading, setLoading] = useState(false)
     const [error, setError] = useState("")
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [isEditModalOpen, setIsEditModalOpen] = useState(false);
-    const [isToggleModalOpen, setIsToggleModalOpen] = useState(false);
+    const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+    const [isTiposModalOpen, setIsTiposModalOpen] = useState(false);
     const [currentPage, setCurrentPage] = useState(1);
-    const [ubicaciones, setUbicaciones] = useState<UbicacionResponse[]>([]);
-    const [selectedUbicacion, setSelectedUbicacion] = useState<UbicacionResponse | null>(null);
-    const [isToggling, setIsToggling] = useState(false);
+    const [categorias, setCategorias] = useState<CategoriaResponse[]>([]);
+    const [selectedCategoria, setSelectedCategoria] = useState<CategoriaResponse | null>(null);
+    const [isDeleting, setIsDeleting] = useState(false);
 
-    // Cargar ubicaciones al montar el componente
+    // Cargar categorías al montar el componente
     useEffect(() => {
-        cargarUbicaciones();
+        cargarCategorias();
     }, []);
 
-    const cargarUbicaciones = async () => {
+    const cargarCategorias = async () => {
         setLoading(true);
         setError("");
         try {
-            const data = await listarUbicacionesService();
-            setUbicaciones(data);
+            const data = await listarCategoriasService();
+            setCategorias(data);
         } catch (err: any) {
-            setError(err.response?.data?.message || "Error al cargar las ubicaciones");
+            setError(err.response?.data?.message || "Error al cargar las categorías");
         } finally {
             setLoading(false);
         }
@@ -43,10 +45,10 @@ export default function UbicacionesAdmin() {
 
     // Filtrado
     const filteredData = useMemo(() => {
-        return ubicaciones.filter(item =>
-            item.nombre_ubicacion.toLowerCase().includes(searchTerm.toLowerCase())
+        return categorias.filter(item =>
+            item.nombre_categoria.toLowerCase().includes(searchTerm.toLowerCase())
         );
-    }, [ubicaciones, searchTerm]);
+    }, [categorias, searchTerm]);
 
     // Paginación
     const totalPages = Math.ceil(filteredData.length / ITEMS_PER_PAGE);
@@ -62,53 +64,58 @@ export default function UbicacionesAdmin() {
 
     const openModal = () => setIsModalOpen(true);
 
-    const handleSubmit = async (data: CreateUbicacionRequest) => {
+    const handleSubmit = async (data: CreateCategoriaRequest) => {
         try {
-            await crearUbicacionService(data);
-            // Recargar la lista de ubicaciones
-            await cargarUbicaciones();
+            await crearCategoriaService(data);
+            // Recargar la lista de categorías
+            await cargarCategorias();
         } catch (error) {
-            console.error("Error al crear ubicación:", error);
+            console.error("Error al crear categoría:", error);
         }
     }
 
-    const handleEdit = (ubicacion: UbicacionResponse) => {
-        setSelectedUbicacion(ubicacion);
+    const handleEdit = (categoria: CategoriaResponse) => {
+        setSelectedCategoria(categoria);
         setIsEditModalOpen(true);
     }
 
-    const handleUpdate = async (id: number, data: CreateUbicacionRequest) => {
+    const handleUpdate = async (id: number, data: CreateCategoriaRequest) => {
         try {
-            await actualizarUbicacionService(id, data);
-            // Recargar la lista de ubicaciones
-            await cargarUbicaciones();
+            await actualizarCategoriaService(id, data);
+            // Recargar la lista de categorías
+            await cargarCategorias();
         } catch (error) {
-            console.error("Error al actualizar ubicación:", error);
+            console.error("Error al actualizar categoría:", error);
             throw error;
         }
     }
 
-    const openToggleModal = (ubicacion: UbicacionResponse) => {
-        setSelectedUbicacion(ubicacion);
-        setIsToggleModalOpen(true);
+    const openDeleteModal = (categoria: CategoriaResponse) => {
+        setSelectedCategoria(categoria);
+        setIsDeleteModalOpen(true);
     }
 
-    const handleToggleActive = async () => {
-        if (!selectedUbicacion) return;
+    const handleDelete = async () => {
+        if (!selectedCategoria) return;
 
-        setIsToggling(true);
+        setIsDeleting(true);
         try {
-            await eliminarUbicacionService(selectedUbicacion.id_ubicacion);
-            // Recargar la lista de ubicaciones
-            await cargarUbicaciones();
-            setIsToggleModalOpen(false);
-            setSelectedUbicacion(null);
+            await eliminarCategoriaService(selectedCategoria.id_categoria);
+            // Recargar la lista de categorías
+            await cargarCategorias();
+            setIsDeleteModalOpen(false);
+            setSelectedCategoria(null);
         } catch (error) {
-            console.error("Error al cambiar estado de ubicación:", error);
-            alert("Error al cambiar el estado de la ubicación");
+            console.error("Error al eliminar categoría:", error);
+            alert("Error al eliminar la categoría");
         } finally {
-            setIsToggling(false);
+            setIsDeleting(false);
         }
+    }
+
+    const handleOpenTiposModal = (categoria: CategoriaResponse) => {
+        setSelectedCategoria(categoria);
+        setIsTiposModalOpen(true);
     }
 
     // Generar números de página
@@ -128,11 +135,11 @@ export default function UbicacionesAdmin() {
                     <div className="flex items-center justify-between">
                         <div className="flex items-center space-x-3">
                             <div className="p-2 rounded-lg bg-blue-50">
-                                <Map className="w-6 h-6 text-red-600" />
+                                <Tag className="w-6 h-6 text-blue-600" />
                             </div>
                             <div>
-                                <h1 className="text-2xl font-bold text-slate-900">Gestión de Ubicaciones</h1>
-                                <p className="mt-1 text-slate-600">Administra las ubicaciones del inventario (almacenes/tiendas)</p>
+                                <h1 className="text-2xl font-bold text-slate-900">Gestión de Categorías</h1>
+                                <p className="mt-1 text-slate-600">Administra las categorías de productos</p>
                             </div>
                         </div>
                         <button
@@ -140,7 +147,7 @@ export default function UbicacionesAdmin() {
                             onClick={openModal}
                         >
                             <Plus className="w-4 h-4" />
-                            <span>Nueva Ubicación</span>
+                            <span>Nueva Categoría</span>
                         </button>
                     </div>
                 </div>
@@ -151,7 +158,7 @@ export default function UbicacionesAdmin() {
                             <div className="relative">
                                 <Search className="absolute w-4 h-4 transform -translate-y-1/2 left-3 top-1/2 text-slate-400" />
                                 <input
-                                    placeholder="Buscar por nombre de ubicación..."
+                                    placeholder="Buscar por nombre de categoría..."
                                     value={searchTerm}
                                     onChange={(e) => handleSearch(e.target.value)}
                                     className="w-full py-2.5 pl-10 pr-4 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors"
@@ -160,7 +167,7 @@ export default function UbicacionesAdmin() {
                         </div>
                         <div className="flex items-center px-3 py-2 text-sm border rounded-lg bg-slate-50 border-slate-200">
                             <span className="font-medium text-slate-700">{filteredData.length}</span>
-                            <span className="ml-1 text-slate-500">ubicaciones</span>
+                            <span className="ml-1 text-slate-500">categorías</span>
                         </div>
                     </div>
                 </div>
@@ -173,31 +180,30 @@ export default function UbicacionesAdmin() {
                         <thead className="border-b bg-slate-50 border-slate-200">
                             <tr>
                                 <th className="px-6 py-4 text-xs font-semibold tracking-wider text-center uppercase text-slate-600">ID</th>
-                                <th className="px-6 py-4 text-xs font-semibold tracking-wider text-center uppercase text-slate-600">Nombre de Ubicación</th>
-                                <th className="px-6 py-4 text-xs font-semibold tracking-wider text-center uppercase text-slate-600">Estado</th>
+                                <th className="px-6 py-4 text-xs font-semibold tracking-wider text-center uppercase text-slate-600">Nombre de Categoría</th>
                                 <th className="px-6 py-4 text-xs font-semibold tracking-wider text-center uppercase text-slate-600">Acciones</th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-200">
                             {loading && (
                                 <tr>
-                                    <td colSpan={4} className="py-16 text-center">
+                                    <td colSpan={3} className="py-16 text-center">
                                         <div className="flex flex-col items-center space-y-3">
                                             <div className="w-8 h-8 border-2 border-blue-600 rounded-full border-t-transparent animate-spin"></div>
-                                            <p className="text-slate-600">Cargando ubicaciones...</p>
+                                            <p className="text-slate-600">Cargando categorías...</p>
                                         </div>
                                     </td>
                                 </tr>
                             )}
                             {error && (
                                 <tr>
-                                    <td colSpan={4} className="py-16 text-center">
+                                    <td colSpan={3} className="py-16 text-center">
                                         <div className="flex flex-col items-center space-y-3">
                                             <div className="p-3 rounded-full bg-red-50">
                                                 <AlertCircle className="w-6 h-6 text-red-600" />
                                             </div>
                                             <div>
-                                                <p className="font-medium text-red-900">Error al cargar las ubicaciones</p>
+                                                <p className="font-medium text-red-900">Error al cargar las categorías</p>
                                                 <p className="mt-1 text-sm text-red-600">{error}</p>
                                             </div>
                                         </div>
@@ -212,7 +218,7 @@ export default function UbicacionesAdmin() {
                                                 <Search className="w-6 h-6 text-slate-400" />
                                             </div>
                                             <div>
-                                                <p className="font-medium text-slate-700">No se encontraron ubicaciones</p>
+                                                <p className="font-medium text-slate-700">No se encontraron categorías</p>
                                                 <p className="mt-1 text-sm text-slate-500">Intenta con otros términos de búsqueda</p>
                                             </div>
                                         </div>
@@ -221,41 +227,37 @@ export default function UbicacionesAdmin() {
                             )}
                             {!loading &&
                                 currentData.map((item) => (
-                                    <tr key={item.id_ubicacion} className="transition-colors hover:bg-slate-50 items-center">
+                                    <tr key={item.id_categoria} className="transition-colors hover:bg-slate-50 items-center">
                                         <td className="px-6 py-4 text-center whitespace-nowrap">
-                                            <div className="text-sm font-medium text-slate-900">{item.id_ubicacion}</div>
+                                            <div className="text-sm font-medium text-slate-900">{item.id_categoria}</div>
                                         </td>
                                         <td className="px-6 py-4 text-center">
                                             <div className="max-w-xs mx-auto">
-                                                <p className="text-sm font-medium text-slate-900">{item.nombre_ubicacion}</p>
+                                                <p className="text-sm font-medium text-slate-900">{item.nombre_categoria}</p>
                                             </div>
-                                        </td>
-                                        <td className="px-6 py-4 text-center whitespace-nowrap">
-                                            <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${item.activo
-                                                ? 'bg-green-100 text-green-800'
-                                                : 'bg-red-100 text-red-800'
-                                                }`}>
-                                                {item.activo ? 'Activo' : 'Inactivo'}
-                                            </span>
                                         </td>
                                         <td className="px-6 py-4 text-center whitespace-nowrap">
                                             <div className="flex items-center justify-center space-x-1">
                                                 <button
+                                                    className="p-2 transition-colors rounded-lg text-slate-400 hover:text-blue-600 hover:bg-blue-50"
+                                                    onClick={() => handleOpenTiposModal(item)}
+                                                    title="Agregar Tipo"
+                                                >
+                                                    <BadgePlus className="w-4 h-4" />
+                                                </button>
+                                                <button
                                                     className="p-2 transition-colors rounded-lg text-slate-400 hover:text-emerald-600 hover:bg-emerald-50"
                                                     onClick={() => handleEdit(item)}
-                                                    title="Editar ubicación"
+                                                    title="Editar categoría"
                                                 >
                                                     <Edit className="w-4 h-4" />
                                                 </button>
                                                 <button
-                                                    onClick={() => openToggleModal(item)}
-                                                    className={`p-2 rounded-lg transition-colors ${item.activo
-                                                        ? 'text-slate-400 hover:text-red-600 hover:bg-red-50'
-                                                        : 'text-slate-400 hover:text-green-600 hover:bg-green-50'
-                                                        }`}
-                                                    title={item.activo ? 'Desactivar' : 'Activar'}
+                                                    className="p-2 transition-colors rounded-lg text-slate-400 hover:text-red-600 hover:bg-red-50"
+                                                    onClick={() => openDeleteModal(item)}
+                                                    title="Eliminar categoría"
                                                 >
-                                                    <Power className="w-4 h-4" />
+                                                    <Trash2 className="w-4 h-4" />
                                                 </button>
                                             </div>
                                         </td>
@@ -271,7 +273,7 @@ export default function UbicacionesAdmin() {
                         <div className="text-sm text-slate-600">
                             Mostrando <span className="font-medium text-slate-900">{startIndex + 1}</span> a{" "}
                             <span className="font-medium text-slate-900">{Math.min(endIndex, filteredData.length)}</span> de{" "}
-                            <span className="font-medium text-slate-900">{filteredData.length}</span> ubicaciones
+                            <span className="font-medium text-slate-900">{filteredData.length}</span> categorías
                         </div>
 
                         <div className="flex items-center gap-2">
@@ -311,27 +313,32 @@ export default function UbicacionesAdmin() {
             </div>
 
             {/* Modales */}
-            <CrearUbicacionModal
+            <CrearCategoriaProModal
                 isOpen={isModalOpen}
                 onClose={() => setIsModalOpen(false)}
                 onSubmit={handleSubmit}
             />
 
-            <ActualizarUbicacionModal
+            <ActualizarCategoriaProModal
                 isOpen={isEditModalOpen}
                 onClose={() => setIsEditModalOpen(false)}
                 onSubmit={handleUpdate}
-                ubicacion={selectedUbicacion}
+                categoria={selectedCategoria}
             />
 
+            <ConfirmDeleteModal
+                isOpen={isDeleteModalOpen}
+                onClose={() => setIsDeleteModalOpen(false)}
+                onConfirm={handleDelete}
+                itemName={selectedCategoria?.nombre_categoria || ''}
+                isDeleting={isDeleting}
+            />
 
-            <ConfirmToggleModal
-                isOpen={isToggleModalOpen}
-                onClose={() => setIsToggleModalOpen(false)}
-                onConfirm={handleToggleActive}
-                itemName={selectedUbicacion?.nombre_ubicacion || ''}
-                isActive={selectedUbicacion?.activo || false}
-                isToggling={isToggling}
+            <GestionarTiposModal
+                isOpen={isTiposModalOpen}
+                onClose={() => setIsTiposModalOpen(false)}
+                idCategoria={selectedCategoria?.id_categoria || 0}
+                nombreCategoria={selectedCategoria?.nombre_categoria || ''}
             />
         </div>
     )

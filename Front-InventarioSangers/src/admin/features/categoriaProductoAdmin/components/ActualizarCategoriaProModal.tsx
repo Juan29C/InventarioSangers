@@ -1,20 +1,35 @@
 import { X } from 'lucide-react';
-import { useState } from 'react';
-import { ubicacionSchema } from '../schemas/UbicacionesSchema';
-import type { CreateUbicacionRequest } from '../schemas/Inferface';
+import { useState, useEffect } from 'react';
+import { categoriaProductoSchema } from '../schemas/CategoriaProductoSchema';
+import type { CreateCategoriaRequest, CategoriaResponse } from '../schemas/Interface';
 
-interface CrearUbicacionModalProps {
+interface ActualizarCategoriaProModalProps {
     isOpen: boolean;
     onClose: () => void;
-    onSubmit: (data: CreateUbicacionRequest) => Promise<void>;
+    onSubmit: (id: number, data: CreateCategoriaRequest) => Promise<void>;
+    categoria: CategoriaResponse | null;
 }
 
-export const CrearUbicacionModal = ({ isOpen, onClose, onSubmit }: CrearUbicacionModalProps) => {
-    const [formData, setFormData] = useState<CreateUbicacionRequest>({
-        nombre_ubicacion: '',
+export const ActualizarCategoriaProModal = ({
+    isOpen,
+    onClose,
+    onSubmit,
+    categoria
+}: ActualizarCategoriaProModalProps) => {
+    const [formData, setFormData] = useState<CreateCategoriaRequest>({
+        nombre_categoria: '',
     });
     const [errors, setErrors] = useState<Record<string, string>>({});
     const [isSubmitting, setIsSubmitting] = useState(false);
+
+    // Cargar datos de la categoría cuando se abre el modal
+    useEffect(() => {
+        if (categoria) {
+            setFormData({
+                nombre_categoria: categoria.nombre_categoria,
+            });
+        }
+    }, [categoria]);
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const { name, value } = e.target;
@@ -29,17 +44,18 @@ export const CrearUbicacionModal = ({ isOpen, onClose, onSubmit }: CrearUbicacio
         e.preventDefault();
         setErrors({});
 
+        if (!categoria) return;
+
         try {
             // Validar con Zod
-            const validatedData = ubicacionSchema.parse(formData);
+            const validatedData = categoriaProductoSchema.parse(formData);
             setIsSubmitting(true);
 
             // Llamar al servicio
-            await onSubmit(validatedData);
+            await onSubmit(categoria.id_categoria, validatedData);
 
-            // Limpiar formulario y cerrar modal
-            setFormData({ nombre_ubicacion: '' });
-            onClose();
+            // Cerrar modal
+            handleClose();
         } catch (err: any) {
             if (err.name === 'ZodError') {
                 // Mapear errores de Zod
@@ -57,19 +73,19 @@ export const CrearUbicacionModal = ({ isOpen, onClose, onSubmit }: CrearUbicacio
     };
 
     const handleClose = () => {
-        setFormData({ nombre_ubicacion: '' });
+        setFormData({ nombre_categoria: '' });
         setErrors({});
         onClose();
     };
 
-    if (!isOpen) return null;
+    if (!isOpen || !categoria) return null;
 
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
             <div className="relative w-full max-w-md p-6 bg-white rounded-xl shadow-xl">
                 {/* Header */}
                 <div className="flex items-center justify-between mb-6">
-                    <h2 className="text-xl font-bold text-slate-900">Nueva Ubicación</h2>
+                    <h2 className="text-xl font-bold text-slate-900">Editar Categoría</h2>
                     <button
                         onClick={handleClose}
                         className="p-1 text-slate-400 hover:text-slate-600 transition-colors"
@@ -81,21 +97,21 @@ export const CrearUbicacionModal = ({ isOpen, onClose, onSubmit }: CrearUbicacio
                 {/* Form */}
                 <form onSubmit={handleSubmit} className="space-y-4">
                     <div>
-                        <label htmlFor="nombre_ubicacion" className="block text-sm font-medium text-slate-700 mb-1">
-                            Nombre de la Ubicación
+                        <label htmlFor="nombre_categoria" className="block text-sm font-medium text-slate-700 mb-1">
+                            Nombre de la Categoría
                         </label>
                         <input
-                            id="nombre_ubicacion"
-                            name="nombre_ubicacion"
+                            id="nombre_categoria"
+                            name="nombre_categoria"
                             type="text"
-                            value={formData.nombre_ubicacion}
+                            value={formData.nombre_categoria}
                             onChange={handleChange}
-                            className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors ${errors.nombre_ubicacion ? 'border-red-500' : 'border-slate-300'
+                            className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors ${errors.nombre_categoria ? 'border-red-500' : 'border-slate-300'
                                 }`}
-                            placeholder="Ej: Almacén Central"
+                            placeholder="Ej: Riesgos"
                         />
-                        {errors.nombre_ubicacion && (
-                            <p className="mt-1 text-sm text-red-600">{errors.nombre_ubicacion}</p>
+                        {errors.nombre_categoria && (
+                            <p className="mt-1 text-sm text-red-600">{errors.nombre_categoria}</p>
                         )}
                     </div>
 
@@ -113,7 +129,7 @@ export const CrearUbicacionModal = ({ isOpen, onClose, onSubmit }: CrearUbicacio
                             disabled={isSubmitting}
                             className="px-4 py-2 text-sm font-medium text-white bg-[#132436] rounded-lg hover:bg-[#224666] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                         >
-                            {isSubmitting ? 'Creando...' : 'Crear Ubicación'}
+                            {isSubmitting ? 'Actualizando...' : 'Actualizar Categoría'}
                         </button>
                     </div>
                 </form>

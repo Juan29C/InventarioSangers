@@ -48,6 +48,9 @@ const TipoServiciosAdmin = lazy(() =>
 const VentasAdmin = lazy (() =>
   import('../../admin/features/ventasAdmin/pages/VentasAdmin').then((module) => ({ default: module.default }))
 );
+const CategoriaProductoAdmin = lazy(() =>
+  import('../../admin/features/categoriaProductoAdmin/pages/CategoriaProductoAdmin').then((module) => ({ default: module.default }))
+);
 
 export const routes = [
   // Ruta principal - Página de login (vista principal)
@@ -147,6 +150,14 @@ export const routes = [
         element: (
           <LazyWrapper>
             <UbicacionesAdmin />
+          </LazyWrapper>
+        ),
+      },
+      {
+        path: 'inventario/categorias-tipos',
+        element: (
+          <LazyWrapper>
+            <CategoriaProductoAdmin />
           </LazyWrapper>
         ),
       },
