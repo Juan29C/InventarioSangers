@@ -1,9 +1,12 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { loginService } from '../services/IniciarSesion';
+import { loginSchema } from '../schemas/IniciarSesionSchema';
+import type { LoginRequest } from '../schemas/Interface';
 
 export const LoginForm = () => {
-  const [credentials, setCredentials] = useState({
-    username: '',
+  const [credentials, setCredentials] = useState<LoginRequest>({
+    email: '',
     password: ''
   });
   const [error, setError] = useState('');
@@ -15,20 +18,36 @@ export const LoginForm = () => {
     setIsLoading(true);
     setError('');
 
-    // Simulamos un pequeño delay para la experiencia de usuario
-    setTimeout(() => {
-      if (credentials.username === 'admin123' && credentials.password === 'admin123') {
-        // Guardamos el estado de autenticación
-        localStorage.setItem('isAuthenticated', 'true');
-        localStorage.setItem('userRole', 'administrator');
-        
-        // Redirigimos al panel administrativo
-        navigate('/administrator');
+    try {
+      // Validar con Zod
+      const validatedData = loginSchema.parse(credentials);
+
+      // Llamar al servicio de login
+      const response = await loginService(validatedData);
+
+      // Limpiar cualquier dato antiguo de localStorage
+      localStorage.clear();
+
+      // Guardar solo el token
+      localStorage.setItem('authToken', response.token);
+
+      // Redirigir al panel administrativo
+      navigate('/administrator');
+    } catch (err: any) {
+      if (err.name === 'ZodError') {
+        // Error de validación de Zod
+        setError(err.errors[0]?.message || 'Error de validación');
+      } else if (err.response?.data?.message) {
+        // Error del servidor
+        setError(err.response.data.message);
+      } else if (err.response?.status === 401) {
+        setError('Credenciales incorrectas');
       } else {
-        setError('Credenciales incorrectas. Usa admin123 / admin123');
+        setError('Error al iniciar sesión. Intenta nuevamente.');
       }
+    } finally {
       setIsLoading(false);
-    }, 800);
+    }
   };
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -61,21 +80,21 @@ export const LoginForm = () => {
           <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
             <div className="space-y-4">
               <div>
-                <label htmlFor="username" className="block text-sm font-medium text-gray-700 mb-1">
-                  Usuario
+                <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-1">
+                  Email
                 </label>
                 <input
-                  id="username"
-                  name="username"
-                  type="text"
+                  id="email"
+                  name="email"
+                  type="email"
                   required
-                  value={credentials.username}
+                  value={credentials.email}
                   onChange={handleChange}
                   className="appearance-none relative block w-full px-3 py-3 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 focus:z-10 sm:text-sm"
-                  placeholder="Ingresa tu usuario"
+                  placeholder="Ingresa tu email"
                 />
               </div>
-              
+
               <div>
                 <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-1">
                   Contraseña
@@ -121,12 +140,7 @@ export const LoginForm = () => {
               )}
             </button>
 
-            {/* Demo Info */}
-            <div className="mt-4 p-3 bg-gray-50 rounded-lg">
-              <p className="text-xs text-gray-600 text-center">
-                <strong>Demo:</strong> Usuario: admin123 | Contraseña: admin123
-              </p>
-            </div>
+
           </form>
 
           {/* Back to Home */}

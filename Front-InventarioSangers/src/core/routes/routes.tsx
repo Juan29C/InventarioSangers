@@ -34,6 +34,24 @@ const ExtintoresAdmin = lazy(() =>
   import('../../admin/features/extintoresAdmin/pages/ExtintoresAdmin').then((module) => ({ default: module.default }))
 );
 
+const UbicacionesAdmin = lazy(() =>
+  import('../../admin/features/ubicacionesAdmin/pages/UbicacionesAdmin').then((module) => ({ default: module.default }))
+);
+
+const ServiciosAdmin = lazy(() =>
+  import('../../admin/features/serviciosAdmin/pages/ServiciosAdmin').then((module) => ({ default: module.default }))
+);
+
+const TipoServiciosAdmin = lazy(() =>
+  import('../../admin/features/tipoServicioAdmin/pages/TipoServiciosAdmin').then((module) => ({ default: module.default }))
+);
+const VentasAdmin = lazy (() =>
+  import('../../admin/features/ventasAdmin/pages/VentasAdmin').then((module) => ({ default: module.default }))
+);
+const CategoriaProductoAdmin = lazy(() =>
+  import('../../admin/features/categoriaProductoAdmin/pages/CategoriaProductoAdmin').then((module) => ({ default: module.default }))
+);
+
 export const routes = [
   // Ruta principal - Página de login (vista principal)
   {
@@ -80,10 +98,18 @@ export const routes = [
         ),
       },
       {
-        path: 'inventario',
+        path: 'inventario/productos',
         element: (
           <LazyWrapper>
             <InventarioAdmin />
+          </LazyWrapper>
+        ),
+      },
+      {
+        path: 'operaciones',
+        element: (
+          <LazyWrapper>
+            <VentasAdmin />
           </LazyWrapper>
         ),
       },
@@ -96,7 +122,7 @@ export const routes = [
         ),
       },
       {
-        path: 'cronograma',
+        path: 'servicios/cronograma',
         element: (
           <LazyWrapper>
             <CronogramaAdmin />
@@ -104,10 +130,10 @@ export const routes = [
         ),
       },
       {
-        path: 'crm',
+        path: 'servicios/historial',
         element: (
           <LazyWrapper>
-            <CrmAdmin />
+            <ServiciosAdmin />
           </LazyWrapper>
         ),
       },
@@ -119,6 +145,38 @@ export const routes = [
           </LazyWrapper>
         ),
       },
+      {
+        path: 'inventario/ubicaciones',
+        element: (
+          <LazyWrapper>
+            <UbicacionesAdmin />
+          </LazyWrapper>
+        ),
+      },
+      {
+        path: 'inventario/categorias-tipos',
+        element: (
+          <LazyWrapper>
+            <CategoriaProductoAdmin />
+          </LazyWrapper>
+        ),
+      },
+      {
+        path: 'servicios/tipos',
+        element: (
+          <LazyWrapper>
+            <TipoServiciosAdmin />
+          </LazyWrapper>
+        ),
+      },
+      {
+        path: 'crm',
+        element: (
+          <LazyWrapper>
+            <CrmAdmin />
+          </LazyWrapper>
+        ),
+      }
     ],
   },
 
