@@ -6,14 +6,11 @@ import { registrarEntradaService } from "../services/Ajustes/registrarEntrada";
 import { registrarSalidaService } from "../services/Ajustes/registrarSalida";
 import { moverStockService } from "../services/Ajustes/moverStock";
 import { listarStockService } from "../services/listarStock";
-import type { CreateEntradaRequest, CreateSalidaRequest, CreateTrasladoRequest, StockUbicacionResponse } from "../schema/Interface";
-import { entradaSchema, salidaSchema, trasladoSchema } from "../schema/InventarioSchema";
-
-interface Promocion {
-    id: number;
-    cantidadMinima: number;
-    descuento: number;
-}
+import { listarPromocionesService } from "../services/Promociones/listarPromocion";
+import { crearPromocionService } from "../services/Promociones/crearPromocion";
+import { actualizarPromocionService } from "../services/Promociones/actualizarPromocion";
+import type { CreateEntradaRequest, CreateSalidaRequest, CreateTrasladoRequest, StockUbicacionResponse, PromocionResponse, CreatePromocionRequest, UpdatePromocionRequest } from "../schema/Interface";
+import { entradaSchema, salidaSchema, trasladoSchema, promocionSchema, updatePromocionSchema } from "../schema/InventarioSchema";
 
 interface ModalGestionInventarioProps {
     isOpen: boolean;
@@ -57,10 +54,20 @@ export function ModalGestionInventario({ isOpen, onClose, onSubmit, producto }: 
     const [stockData, setStockData] = useState<StockUbicacionResponse[]>([]);
     const [loadingStock, setLoadingStock] = useState(false);
 
-    // Estados para Promociones
-    const [promociones, setPromociones] = useState<Promocion[]>([
-        { id: 1, cantidadMinima: 3, descuento: 2.0 }
-    ]);
+    // Estados para Promociones (dinámico)
+    const [promociones, setPromociones] = useState<PromocionResponse[]>([]);
+    const [loadingPromociones, setLoadingPromociones] = useState(false);
+    const [editingPromocionId, setEditingPromocionId] = useState<number | null>(null);
+    const [editedPromos, setEditedPromos] = useState<Record<number, PromocionResponse>>({});
+
+    // Estado para nueva promoción
+    const [showNewPromoForm, setShowNewPromoForm] = useState(false);
+    const [newPromo, setNewPromo] = useState({
+        cantidad_minima: '',
+        precio_oferta: '',
+        prioridad: '50',
+        activo: true
+    });
 
     // Cargar ubicaciones al abrir el modal
     useEffect(() => {
@@ -108,21 +115,121 @@ export function ModalGestionInventario({ isOpen, onClose, onSubmit, producto }: 
         fetchStock();
     }, [activeTab, producto?.id_producto]);
 
+    // Cargar promociones cuando se activa el tab de promociones
+    useEffect(() => {
+        const fetchPromociones = async () => {
+            if (activeTab === 'promociones' && producto?.id_producto) {
+                setLoadingPromociones(true);
+                try {
+                    const data = await listarPromocionesService(producto.id_producto);
+                    setPromociones(data);
+                } catch (error) {
+                    console.error("Error al cargar promociones:", error);
+                    setPromociones([]);
+                } finally {
+                    setLoadingPromociones(false);
+                }
+            }
+        };
+
+        fetchPromociones();
+    }, [activeTab, producto?.id_producto]);
+
     const agregarPromocion = () => {
-        const newId = Math.max(...promociones.map(p => p.id), 0) + 1;
-        setPromociones([...promociones, { id: newId, cantidadMinima: 0, descuento: 0 }]);
+        setShowNewPromoForm(true);
+        setError(null);
+        // Calcular la siguiente cantidad mínima sugerida
+        const cantidadesExistentes = promociones.map(p => p.cantidad_minima);
+        const siguienteCantidad = cantidadesExistentes.length > 0
+            ? Math.max(...cantidadesExistentes) + 1
+            : 1;
+
+        setNewPromo({
+            cantidad_minima: siguienteCantidad.toString(),
+            precio_oferta: (parseFloat(producto.precio_venta_unitario) * 0.9).toFixed(2),
+            prioridad: '50',
+            activo: true
+        });
     };
 
-    const eliminarPromocion = (id: number) => {
-        if (promociones.length > 1) {
-            setPromociones(promociones.filter(p => p.id !== id));
+    const cancelarNuevaPromo = () => {
+        setShowNewPromoForm(false);
+        setNewPromo({
+            cantidad_minima: '',
+            precio_oferta: '',
+            prioridad: '50',
+            activo: true
+        });
+        setError(null);
+    };
+
+    const guardarNuevaPromocion = async () => {
+        if (!producto?.id_producto) return;
+
+        setSubmitting(true);
+        setError(null);
+
+        try {
+            const nuevaPromocion: CreatePromocionRequest = {
+                id_producto: producto.id_producto,
+                cantidad_minima: parseInt(newPromo.cantidad_minima) || 1,
+                precio_oferta: parseFloat(newPromo.precio_oferta) || 0,
+                prioridad: parseInt(newPromo.prioridad) || 50,
+                activo: newPromo.activo,
+            };
+
+            // Validar con Zod
+            const validationResult = promocionSchema.safeParse(nuevaPromocion);
+            if (!validationResult.success) {
+                throw new Error(validationResult.error.issues[0].message);
+            }
+
+            const response = await crearPromocionService(nuevaPromocion);
+            setPromociones([...promociones, response]);
+            cancelarNuevaPromo();
+        } catch (err: any) {
+            console.error("Error al crear promoción:", err);
+            const errorMessage = err.response?.data?.message || err.message || "Error al crear la promoción";
+            setError(errorMessage);
+        } finally {
+            setSubmitting(false);
         }
     };
 
-    const actualizarPromocion = (id: number, field: 'cantidadMinima' | 'descuento', value: number) => {
-        setPromociones(promociones.map(p =>
-            p.id === id ? { ...p, [field]: value } : p
-        ));
+    const guardarPromocionEditada = async (id_promo: number) => {
+        const promo = editedPromos[id_promo];
+        if (!promo) return;
+
+        try {
+            const updateData: UpdatePromocionRequest = {
+                cantidad_minima: promo.cantidad_minima,
+                precio_oferta: parseFloat(promo.precio_oferta),
+                prioridad: promo.prioridad,
+                activo: promo.activo
+            };
+
+            // Validar con Zod
+            const validationResult = updatePromocionSchema.safeParse(updateData);
+            if (!validationResult.success) {
+                throw new Error(validationResult.error.issues[0].message);
+            }
+
+            const response = await actualizarPromocionService(id_promo, updateData);
+
+            // Actualizar en el estado local
+            setPromociones(promociones.map(p =>
+                p.id_promo === id_promo ? response : p
+            ));
+            setEditingPromocionId(null); // Salir del modo edición
+            // Limpiar el estado editado
+            const newEditedPromos = { ...editedPromos };
+            delete newEditedPromos[id_promo];
+            setEditedPromos(newEditedPromos);
+        } catch (err: any) {
+            console.error("Error al actualizar promoción:", err);
+            const errorMessage = err.response?.data?.message || err.message || "Error al actualizar la promoción";
+            setError(errorMessage);
+        }
     };
 
     const handleSubmitAñadir = async (e: React.FormEvent) => {
@@ -316,14 +423,6 @@ export function ModalGestionInventario({ isOpen, onClose, onSubmit, producto }: 
         } finally {
             setSubmitting(false);
         }
-    };
-
-    const handleSubmitPromociones = () => {
-        const data = {
-            tipo: 'promociones',
-            promociones: promociones,
-        };
-        onSubmit(data);
     };
 
     const resetFormAñadir = () => {
@@ -808,73 +907,266 @@ export function ModalGestionInventario({ isOpen, onClose, onSubmit, producto }: 
                                     <h3 className="text-sm font-semibold text-slate-900">Promociones por Mayor</h3>
                                     <p className="text-xs text-slate-600">Configure descuentos automáticos al comprar grandes cantidades</p>
                                 </div>
-                                <button
-                                    type="button"
-                                    onClick={agregarPromocion}
-                                    className="flex items-center px-3 py-1.5 space-x-1 text-sm font-medium text-orange-700 transition-colors bg-orange-100 rounded-lg hover:bg-orange-200"
-                                >
-                                    <Plus className="w-4 h-4" />
-                                    <span>Agregar</span>
-                                </button>
+                                {!showNewPromoForm && (
+                                    <button
+                                        type="button"
+                                        onClick={agregarPromocion}
+                                        disabled={submitting || loadingPromociones}
+                                        className="flex items-center px-3 py-1.5 space-x-1 text-sm font-medium text-orange-700 transition-colors bg-orange-100 rounded-lg hover:bg-orange-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                                    >
+                                        <Plus className="w-4 h-4" />
+                                        <span>Agregar</span>
+                                    </button>
+                                )}
                             </div>
 
-                            <div className="space-y-3">
-                                {promociones.map((promo) => (
-                                    <div key={promo.id} className="grid grid-cols-1 gap-3 p-4 border rounded-lg md:grid-cols-2 bg-slate-50 border-slate-200">
+                            {/* Error Message */}
+                            {error && activeTab === 'promociones' && (
+                                <div className="p-4 border-l-4 border-red-500 bg-red-50">
+                                    <p className="text-sm text-red-800">
+                                        <strong>Error:</strong> {error}
+                                    </p>
+                                </div>
+                            )}
+
+                            {/* Formulario Nueva Promoción */}
+                            {showNewPromoForm && (
+                                <div className="p-4 border-2 border-orange-300 rounded-lg bg-orange-50">
+                                    <div className="flex items-center justify-between mb-3">
+                                        <h4 className="text-sm font-semibold text-slate-900">Nueva Promoción</h4>
+                                        <button
+                                            type="button"
+                                            onClick={cancelarNuevaPromo}
+                                            className="p-1 transition-colors rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-200"
+                                        >
+                                            <X className="w-4 h-4" />
+                                        </button>
+                                    </div>
+                                    <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
                                         <div>
                                             <label className="block mb-1 text-xs font-medium text-slate-700">
-                                                Cantidad mínima
+                                                Cantidad mínima <span className="text-red-600">*</span>
                                             </label>
                                             <input
                                                 type="number"
-                                                value={promo.cantidadMinima}
-                                                onChange={(e) => actualizarPromocion(promo.id, 'cantidadMinima', parseInt(e.target.value) || 0)}
+                                                value={newPromo.cantidad_minima}
+                                                onChange={(e) => setNewPromo({ ...newPromo, cantidad_minima: e.target.value })}
                                                 placeholder="3"
-                                                className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent transition-colors"
+                                                min="1"
+                                                className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent"
                                             />
                                         </div>
-                                        <div className="flex gap-2">
-                                            <div className="flex-1">
-                                                <label className="block mb-1 text-xs font-medium text-slate-700">
-                                                    Descuento (S/) por unidad
-                                                </label>
-                                                <input
-                                                    type="number"
-                                                    step="0.01"
-                                                    value={promo.descuento}
-                                                    onChange={(e) => actualizarPromocion(promo.id, 'descuento', parseFloat(e.target.value) || 0)}
-                                                    placeholder="2.00"
-                                                    className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent transition-colors"
-                                                />
-                                            </div>
-                                            {promociones.length > 1 && (
-                                                <button
-                                                    type="button"
-                                                    onClick={() => eliminarPromocion(promo.id)}
-                                                    className="self-end p-2 transition-colors rounded-lg text-slate-400 hover:text-red-600 hover:bg-red-50"
-                                                    title="Eliminar promoción"
-                                                >
-                                                    <Trash2 className="w-4 h-4" />
-                                                </button>
+
+                                        <div>
+                                            <label className="block mb-1 text-xs font-medium text-slate-700">
+                                                Precio oferta (S/) <span className="text-red-600">*</span>
+                                            </label>
+                                            <input
+                                                type="number"
+                                                step="0.01"
+                                                value={newPromo.precio_oferta}
+                                                onChange={(e) => setNewPromo({ ...newPromo, precio_oferta: e.target.value })}
+                                                placeholder="150.00"
+                                                min="0"
+                                                className={`w-full px-3 py-2 text-sm border rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent ${parseFloat(newPromo.precio_oferta) >= parseFloat(producto.precio_venta_unitario)
+                                                        ? 'border-red-300 bg-red-50'
+                                                        : 'border-slate-300'
+                                                    }`}
+                                            />
+                                            {parseFloat(newPromo.precio_oferta) >= parseFloat(producto.precio_venta_unitario) && (
+                                                <p className="mt-1 text-xs text-red-600 font-medium">
+                                                    ⚠️ El precio es mayor al precio base (S/ {parseFloat(producto.precio_venta_unitario).toFixed(2)})
+                                                </p>
                                             )}
                                         </div>
+                                        <div>
+                                            <label className="block mb-1 text-xs font-medium text-slate-700">
+                                                Prioridad (1-100)
+                                            </label>
+                                            <input
+                                                type="number"
+                                                value={newPromo.prioridad}
+                                                onChange={(e) => setNewPromo({ ...newPromo, prioridad: e.target.value })}
+                                                placeholder="50"
+                                                min="1"
+                                                max="100"
+                                                className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+                                            />
+                                        </div>
                                     </div>
-                                ))}
-                            </div>
+                                    <div className="flex items-center justify-between mt-3 pt-3 border-t border-orange-200">
+                                        <label className="flex items-center space-x-2 cursor-pointer">
+                                            <input
+                                                type="checkbox"
+                                                checked={newPromo.activo}
+                                                onChange={(e) => setNewPromo({ ...newPromo, activo: e.target.checked })}
+                                                className="w-4 h-4 text-orange-600 border-slate-300 rounded focus:ring-orange-500"
+                                            />
+                                            <span className="text-xs font-medium text-slate-700">Promoción activa</span>
+                                        </label>
+                                        <button
+                                            type="button"
+                                            onClick={guardarNuevaPromocion}
+                                            disabled={submitting}
+                                            className="px-4 py-2 text-sm font-medium text-white bg-orange-600 rounded-lg hover:bg-orange-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                                        >
+                                            {submitting ? 'Guardando...' : 'Guardar Promoción'}
+                                        </button>
+                                    </div>
+                                </div>
+                            )}
 
-                            <div className="flex justify-end pt-4">
-                                <button
-                                    type="button"
-                                    onClick={handleSubmitPromociones}
-                                    className="px-6 py-2.5 text-sm font-medium text-white bg-orange-600 rounded-lg hover:bg-orange-700 transition-colors"
-                                >
-                                    Guardar Promociones
-                                </button>
+                            {/* Loading State */}
+                            {loadingPromociones ? (
+                                <div className="flex flex-col items-center justify-center py-12 space-y-2">
+                                    <div className="w-8 h-8 border-4 border-orange-600 rounded-full border-t-transparent animate-spin"></div>
+                                    <p className="text-sm text-slate-600">Cargando promociones...</p>
+                                </div>
+                            ) : promociones.length === 0 && !showNewPromoForm ? (
+                                <div className="py-12 text-center">
+                                    <p className="text-sm text-slate-500">No hay promociones configuradas</p>
+                                    <p className="text-xs text-slate-400 mt-1">Haz clic en "Agregar" para crear una nueva promoción</p>
+                                </div>
+                            ) : (
+                                <div className="space-y-3">
+                                    {promociones.map((promo) => {
+                                        const isEditing = editingPromocionId === promo.id_promo;
+                                        const currentPromo = isEditing ? (editedPromos[promo.id_promo] || promo) : promo;
+
+                                        const updateEditedPromo = (field: keyof PromocionResponse, value: any) => {
+                                            setEditedPromos({
+                                                ...editedPromos,
+                                                [promo.id_promo]: {
+                                                    ...currentPromo,
+                                                    [field]: value
+                                                }
+                                            });
+                                        };
+
+                                        return (
+                                            <div key={promo.id_promo} className={`p-4 border rounded-lg ${isEditing ? 'border-blue-300 bg-blue-50' : 'bg-slate-50 border-slate-200'}`}>
+                                                <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+                                                    <div>
+                                                        <label className="block mb-1 text-xs font-medium text-slate-700">
+                                                            Cantidad mínima
+                                                        </label>
+                                                        <input
+                                                            type="number"
+                                                            value={currentPromo.cantidad_minima}
+                                                            onChange={(e) => isEditing && updateEditedPromo('cantidad_minima', parseInt(e.target.value) || 1)}
+                                                            disabled={!isEditing}
+                                                            min="1"
+                                                            className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-slate-100 disabled:cursor-not-allowed"
+                                                        />
+                                                    </div>
+                                                    <div>
+                                                        <label className="block mb-1 text-xs font-medium text-slate-700">
+                                                            Precio oferta (S/)
+                                                        </label>
+                                                        <input
+                                                            type="number"
+                                                            step="0.01"
+                                                            value={parseFloat(currentPromo.precio_oferta)}
+                                                            onChange={(e) => isEditing && updateEditedPromo('precio_oferta', e.target.value)}
+                                                            disabled={!isEditing}
+                                                            min="0"
+                                                            className={`w-full px-3 py-2 text-sm border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-slate-100 disabled:cursor-not-allowed ${isEditing && parseFloat(currentPromo.precio_oferta) >= parseFloat(producto.precio_venta_unitario)
+                                                                ? 'border-red-300 bg-red-50'
+                                                                : 'border-slate-300'
+                                                                }`}
+                                                        />
+                                                        {isEditing && parseFloat(currentPromo.precio_oferta) >= parseFloat(producto.precio_venta_unitario) && (
+                                                            <p className="mt-1 text-xs text-red-600 font-medium">
+                                                                ⚠️ El precio es mayor al precio base
+                                                            </p>
+                                                        )}
+                                                    </div>
+                                                    <div>
+                                                        <label className="block mb-1 text-xs font-medium text-slate-700">
+                                                            Prioridad (1-100)
+                                                        </label>
+                                                        <input
+                                                            type="number"
+                                                            value={currentPromo.prioridad}
+                                                            onChange={(e) => isEditing && updateEditedPromo('prioridad', parseInt(e.target.value) || 50)}
+                                                            disabled={!isEditing}
+                                                            min="1"
+                                                            max="100"
+                                                            className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-slate-100 disabled:cursor-not-allowed"
+                                                        />
+                                                    </div>
+                                                </div>
+                                                <div className="flex items-center justify-between mt-3 pt-3 border-t border-slate-200">
+                                                    <div className="flex items-center space-x-4">
+                                                        <label className="flex items-center space-x-2 cursor-pointer">
+                                                            <input
+                                                                type="checkbox"
+                                                                checked={currentPromo.activo}
+                                                                onChange={(e) => isEditing && updateEditedPromo('activo', e.target.checked)}
+                                                                disabled={!isEditing}
+                                                                className="w-4 h-4 text-blue-600 border-slate-300 rounded focus:ring-blue-500 disabled:cursor-not-allowed"
+                                                            />
+                                                            <span className="text-xs font-medium text-slate-700">Activa</span>
+                                                        </label>
+                                                        <div className="text-xs text-slate-500">
+                                                            Normal: S/ {parseFloat(producto.precio_venta_unitario).toFixed(2)} •
+                                                            Ahorro: S/ {(parseFloat(producto.precio_venta_unitario) - parseFloat(promo.precio_oferta)).toFixed(2)}
+                                                        </div>
+                                                    </div>
+                                                    <div className="flex items-center space-x-2">
+                                                        {isEditing ? (
+                                                            <>
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() => {
+                                                                        setEditingPromocionId(null);
+                                                                        // Limpiar ediciones
+                                                                        const newEditedPromos = { ...editedPromos };
+                                                                        delete newEditedPromos[promo.id_promo];
+                                                                        setEditedPromos(newEditedPromos);
+                                                                    }}
+                                                                    className="px-3 py-1.5 text-sm font-medium text-slate-700 bg-slate-200 rounded-lg hover:bg-slate-300 transition-colors"
+                                                                >
+                                                                    Cancelar
+                                                                </button>
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() => guardarPromocionEditada(promo.id_promo)}
+                                                                    className="px-3 py-1.5 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition-colors"
+                                                                >
+                                                                    Guardar
+                                                                </button>
+                                                            </>
+                                                        ) : (
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => {
+                                                                    setEditingPromocionId(promo.id_promo);
+                                                                    setEditedPromos({ ...editedPromos, [promo.id_promo]: promo });
+                                                                }}
+                                                                className="px-3 py-1.5 text-sm font-medium text-blue-700 bg-blue-100 rounded-lg hover:bg-blue-200 transition-colors"
+                                                            >
+                                                                <Edit2 className="w-4 h-4 inline mr-1" />
+                                                                Editar
+                                                            </button>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            )}
+
+                            <div className="p-4 border-l-4 border-blue-500 bg-blue-50">
+                                <p className="text-sm text-blue-800">
+                                    <strong>Nota:</strong> Las promociones se guardan al hacer clic en "Guardar". La prioridad determina qué promoción se aplica cuando hay múltiples opciones.
+                                </p>
                             </div>
                         </div>
                     )}
                 </div>
             </div>
-        </div>
+        </div >
     );
 }

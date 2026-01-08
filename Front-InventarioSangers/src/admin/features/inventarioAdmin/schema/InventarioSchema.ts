@@ -133,3 +133,51 @@ export const trasladoSchema = z.object({
 );
 
 export type TrasladoFormData = z.infer<typeof trasladoSchema>;
+
+// Promocion Schema
+export const promocionSchema = z.object({
+    id_producto: z
+        .number({ message: 'El ID del producto es requerido' })
+        .positive('El ID del producto debe ser válido'),
+    cantidad_minima: z
+        .number({ message: 'La cantidad mínima debe ser un número' })
+        .int('La cantidad mínima debe ser un número entero')
+        .positive('La cantidad mínima debe ser mayor a 0')
+        .max(99999, 'La cantidad mínima no puede exceder 99,999'),
+    precio_oferta: z
+        .number({ message: 'El precio de oferta debe ser un número' })
+        .positive('El precio de oferta debe ser mayor a 0')
+        .max(999999.99, 'El precio de oferta no puede exceder 999,999.99'),
+    prioridad: z
+        .number({ message: 'La prioridad debe ser un número' })
+        .int('La prioridad debe ser un número entero')
+        .min(1, 'La prioridad debe ser al menos 1')
+        .max(100, 'La prioridad no puede exceder 100'),
+    activo: z.boolean().default(true),
+});
+
+export type PromocionFormData = z.infer<typeof promocionSchema>;
+
+// Update Promocion Schema (todos los campos opcionales)
+export const updatePromocionSchema = z.object({
+    cantidad_minima: z
+        .number({ message: 'La cantidad mínima debe ser un número' })
+        .int('La cantidad mínima debe ser un número entero')
+        .positive('La cantidad mínima debe ser mayor a 0')
+        .max(99999, 'La cantidad mínima no puede exceder 99,999')
+        .optional(),
+    precio_oferta: z
+        .number({ message: 'El precio de oferta debe ser un número' })
+        .positive('El precio de oferta debe ser mayor a 0')
+        .max(999999.99, 'El precio de oferta no puede exceder 999,999.99')
+        .optional(),
+    prioridad: z
+        .number({ message: 'La prioridad debe ser un número' })
+        .int('La prioridad debe ser un número entero')
+        .min(1, 'La prioridad debe ser al menos 1')
+        .max(100, 'La prioridad no puede exceder 100')
+        .optional(),
+    activo: z.boolean().optional(),
+});
+
+export type UpdatePromocionFormData = z.infer<typeof updatePromocionSchema>;

@@ -106,3 +106,31 @@ export interface StockUbicacionResponse {
         activo: boolean;
     };
 }
+
+// Promotion Interfaces
+export interface CreatePromocionRequest {
+    id_producto: number;
+    cantidad_minima: number;
+    precio_oferta: number;
+    prioridad: number;
+    activo: boolean;
+}
+
+export interface UpdatePromocionRequest {
+    cantidad_minima?: number;
+    precio_oferta?: number;
+    prioridad?: number;
+    activo?: boolean;
+}
+
+export interface PromocionResponse {
+    id_promo: number;
+    id_producto: number;
+    cantidad_minima: number;
+    precio_oferta: string;
+    prioridad: number;
+    activo: boolean;
+    created_at: string;
+    updated_at: string;
+    producto?: ProductoResponse;
+}
